@@ -6,6 +6,9 @@ from sklearn.linear_model import LinearRegression
 st.title("Instagram Likes Predictor")
 
 df = pd.read_csv("lection_updated.csv")
+df["datetime"] = pd.to_datetime(df["Date"], utc=True).dt.tz_convert("Asia/Bahrain")
+df["post_hour"] = df["datetime"].dt.hour
+df["post_day"] = df["datetime"].dt.day_name()
 
 X = df[["post_hour", "post_day", "Type"]]
 y = df["Likes"]
