@@ -6,6 +6,10 @@ from datetime import datetime
 
 st.title('Instagram Likes Predictor')
 
+df["datetime"] = pd.to_datetime(df["datetime"])
+df["post_day"] = df["datetime"].dt.day_name()
+
+
 df = pd.read_csv('lection_updated.csv')
 X = df[['post_hour', 'post_day', 'Type']]
 y = df['Likes']
