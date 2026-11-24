@@ -191,6 +191,8 @@ def ask_openrouter(prompt, image=None, model='openrouter/free', timeout=90):
         encoded=base64.b64encode(buf.getvalue()).decode('ascii')
         content=[{'type':'text','text':prompt},{'type':'image_url','image_url':{'url':'data:image/jpeg;base64,'+encoded}}]
     response=requests.post('https://openrouter.ai/api/v1/chat/completions',headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'},json={'model':model,'messages':[{'role':'user','content':content}]},timeout=timeout)
+    if response.status_code == 429:
+    st.error(response.text)
     response.raise_for_status()
     data=response.json()
     return data['choices'][0]['message']['content']
