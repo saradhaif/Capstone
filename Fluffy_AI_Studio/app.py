@@ -43,7 +43,7 @@ p,label,.stMarkdown {font-family:'DM Sans',sans-serif;}
 .stButton>button[kind="primary"],[data-testid="stFormSubmitButton"]>button[kind="primary"] {background:var(--brown);border-color:var(--brown);color:#fffaf6;}
 .stButton>button[kind="primary"]:hover,[data-testid="stFormSubmitButton"]>button[kind="primary"]:hover {background:#5b3825;color:white;}
 div[data-baseweb="input"]>div,div[data-baseweb="textarea"]>div,div[data-baseweb="select"]>div {border-radius:13px!important;border-color:#e6d4c9!important;}
-.hero {margin-top: 30px;position:relative;overflow:hidden;display:flex;align-items:center;gap:26px;background:linear-gradient(112deg,#e4f4f9 0%,#fff2ed 55%,#f0eafa 100%);border:1.5px solid #eadbd2;border-radius:28px;padding:26px 30px;margin:8px 0 26px;box-shadow:0 12px 35px #55331a0b;}
+.hero {margin-top: 100px;position:relative;overflow:hidden;display:flex;align-items:center;gap:26px;background:linear-gradient(112deg,#e4f4f9 0%,#fff2ed 55%,#f0eafa 100%);border:1.5px solid #eadbd2;border-radius:28px;padding:26px 30px;margin:8px 0 26px;box-shadow:0 12px 35px #55331a0b;}
 .hero-copy {position:relative;z-index:2;} .hero h1 {font-size:clamp(2rem,4vw,3.25rem);line-height:1.05;margin:0 0 10px;} .hero p {font-size:1.03rem;max-width:700px;color:#725b4b;margin:0;}
 .hero-logo {width:145px;min-width:115px;filter:drop-shadow(0 7px 5px #40251518);animation:mascotBob 3.8s ease-in-out infinite;}
 .yarn-float {position:absolute;right:8%;top:13%;font-size:44px;opacity:.9;filter:drop-shadow(0 5px 4px #40251518);animation:yarnDrift 5.5s ease-in-out infinite;pointer-events:none;user-select:none;}
