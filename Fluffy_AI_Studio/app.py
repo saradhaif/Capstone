@@ -143,12 +143,10 @@ def cached_embeddings(photo_bytes: bytes, caption: str):
         arr = tf.keras.applications.mobilenet_v2.preprocess_input(arr)
         st.session_state['_photo_embedding'] = load_image_encoder().predict(arr,verbose=0).astype('float32')
         st.session_state['_photo_embedding_key'] = photo_key
-
+    
     if st.session_state.get('_caption_embedding_key') != text_key:
-        st.session_state['_caption_embedding'] = np.asarray(
-            load_caption_encoder().encode([caption]),dtype='float32'
-        )
-        st.session_state['_caption_embedding_key'] = text_key
+    st.session_state['_caption_embedding'] = encode_caption(caption)
+    st.session_state['_caption_embedding_key'] = text_key
 
     return st.session_state['_photo_embedding'], st.session_state['_caption_embedding']
 
