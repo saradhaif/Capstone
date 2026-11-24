@@ -112,10 +112,22 @@ def load_image_encoder():
     vision.trainable = False
     return vision
 
-@st.cache_resource(show_spinner='Loading caption encoder (first time only)…')
-def load_caption_encoder():
-    from sentence_transformers import SentenceTransformer
-    return SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+import json
+
+def encode_caption(caption):
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "caption_encoder.py")],
+        input=json.dumps({"caption": caption}),
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=180
+    )
+
+    return np.asarray(
+        json.loads(result.stdout),
+        dtype="float32"
+    )
 
 # Store just the most recent photo and caption embeddings in the current user's
 # session. This avoids repeated neural-network inference without keeping every
