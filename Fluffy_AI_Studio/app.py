@@ -33,9 +33,11 @@ st.markdown("""<style>
 :root {--blue:#DFF2F8;--pink:#F6A0AD;--lavender:#B7A5D5;--sage:#DDEBCB;--cream:#FFF4EB;--brown:#402515;}
 .stApp {background:linear-gradient(145deg,#f7fcfd 0%,#fff8f3 48%,#fbf5fc 100%);color:var(--brown);}
 .block-container {
-    max-width: 1280px;
+    max-width: 95% !important;
     padding-top: 5rem !important;
     padding-bottom: 3rem;
+    padding-left: 3rem;
+    padding-right: 3rem;
 }
 h1,h2,h3,.brand-title {font-family:'Fredoka',sans-serif!important;color:var(--brown)!important;}
 p,label,.stMarkdown {font-family:'DM Sans',sans-serif;}
@@ -93,7 +95,17 @@ div.st-key-card_crochet .stButton>button:focus-visible {outline:3px dashed #a88f
 .stitch-note {text-align:center;color:#947e6d;font-size:.9rem;padding:10px 0 2px;}
 @media (prefers-reduced-motion: reduce) {*,*::before,*::after {animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important;}}
 @media(max-width:700px){.feature-banner{padding:13px 15px}.feature-banner .feature-icon{width:46px;height:46px}}
+[data-testid="stSidebar"] {
+    display: none !important;
+}
 
+[data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+}
+
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
 </style>""",unsafe_allow_html=True)
 
 @st.cache_resource(show_spinner='Loading saved prediction models…')
