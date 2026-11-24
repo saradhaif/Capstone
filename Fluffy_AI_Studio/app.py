@@ -94,3 +94,270 @@ div.st-key-card_crochet .stButton>button:focus-visible {outline:3px dashed #a88f
 
 @st.cache_resource(show_spinner='Loading saved prediction models…')
 def load_prediction_models():
+    import joblib
+    import tensorflow as tf
+    likes = tf.keras.models.load_model(ROOT/'models'/'likes_model.keras', compile=False)
+    comments = tf.keras.models.load_model(ROOT/'models'/'comments_model.keras', compile=False)
+    imputer = joblib.load(ROOT/'preprocessing'/'num_imputer.pkl')
+    scaler = joblib.load(ROOT/'preprocessing'/'scaler.pkl')
+    encoder = joblib.load(ROOT/'preprocessing'/'encoder.pkl')
+    return likes, comments, imputer, scaler, encoder
+
+@st.cache_resource(show_spinner='Loading image encoder (first time only)…')
+def load_image_encoder():
+    import tensorflow as tf
+    vision = tf.keras.applications.MobileNetV2(
+        weights='imagenet', include_top=False, pooling='avg', input_shape=(224,224,3)
+    )
+    vision.trainable = False
+    return vision
+
+@st.cache_resource(show_spinner='Loading caption encoder (first time only)…')
+def load_caption_encoder():
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+
+# Store just the most recent photo and caption embeddings in the current user's
+# session. This avoids repeated neural-network inference without keeping every
+# uploaded photo in a shared, potentially large server-wide cache.
+def cached_embeddings(photo_bytes: bytes, caption: str):
+    import tensorflow as tf
+    photo_key = hashlib.sha256(photo_bytes).hexdigest()
+    text_key = hashlib.sha256(caption.encode('utf-8')).hexdigest()
+
+    if st.session_state.get('_photo_embedding_key') != photo_key:
+        photo = Image.open(io.BytesIO(photo_bytes)).convert('RGB').resize((224,224))
+        arr = np.asarray(photo, dtype=np.float32)[None,...]
+        arr = tf.keras.applications.mobilenet_v2.preprocess_input(arr)
+        st.session_state['_photo_embedding'] = load_image_encoder().predict(arr,verbose=0).astype('float32')
+        st.session_state['_photo_embedding_key'] = photo_key
+
+    if st.session_state.get('_caption_embedding_key') != text_key:
+        st.session_state['_caption_embedding'] = np.asarray(
+            load_caption_encoder().encode([caption]),dtype='float32'
+        )
+        st.session_state['_caption_embedding_key'] = text_key
+
+    return st.session_state['_photo_embedding'], st.session_state['_caption_embedding']
+
+NUM_COLS = ['followers','caption_length','word_count','hashtag_count','post_hour']
+CAT_COLS = ['Type','post_day']
+
+def predict_engagement(photo_bytes: bytes, caption: str, followers: int, hour: int, post_type: str, day: str):
+    likes, comments, imputer, scaler, encoder = load_prediction_models()
+    img_vector, text_vector = cached_embeddings(photo_bytes, caption)
+    row = pd.DataFrame([{
+        'followers':followers, 'caption_length':len(caption),
+        'word_count':len(caption.split()), 'hashtag_count':caption.count('#'),
+        'post_hour':hour, 'Type':post_type, 'post_day':day,
+    }])
+    numeric = scaler.transform(imputer.transform(row[NUM_COLS])).astype('float32')
+    categorical = encoder.transform(row[CAT_COLS].fillna('Missing')).astype('float32')
+    inputs = {'image':img_vector,'caption':text_vector,'numerical':numeric,'categorical':categorical}
+    results=[]
+    for model in (likes,comments):
+        log_prediction = float(model.predict(inputs,verbose=0).reshape(-1)[0])
+        results.append(max(0,round(float(np.expm1(np.clip(log_prediction,-20,20))))))
+    return results
+
+
+def get_api_key():
+    try:
+        secret = st.secrets.get('OPENROUTER_API_KEY','')
+    except Exception:
+        secret = ''
+    return secret or os.getenv('OPENROUTER_API_KEY','')
+
+
+def ask_openrouter(prompt, image=None, model='openrouter/free', timeout=90):
+    key = get_api_key()
+    if not key:
+        raise ValueError('OpenRouter key not found. Put capstonekey.env beside app.py with OPENROUTER_API_KEY=your_key, then restart Streamlit.')
+    content = prompt
+    if image is not None:
+        image = image.convert('RGB')
+        buf=io.BytesIO()
+        image.save(buf,format='JPEG',quality=85)
+        encoded=base64.b64encode(buf.getvalue()).decode('ascii')
+        content=[{'type':'text','text':prompt},{'type':'image_url','image_url':{'url':'data:image/jpeg;base64,'+encoded}}]
+    response=requests.post('https://openrouter.ai/api/v1/chat/completions',headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'},json={'model':model,'messages':[{'role':'user','content':content}]},timeout=timeout)
+    response.raise_for_status()
+    data=response.json()
+    return data['choices'][0]['message']['content']
+
+
+def is_listening(port):
+    with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:
+        return sock.connect_ex(('127.0.0.1',port))==0
+
+@st.cache_resource(show_spinner=False)
+def start_engine():
+    source=ROOT/'crochet_engine'
+    if not (source/'index.html').exists():
+        return None,'3D engine files are missing.'
+    port=int(os.getenv('CROCHETPARADE_LOCAL_PORT','8766'))
+    if not is_listening(port):
+        kwargs={'cwd':str(source),'stdout':subprocess.DEVNULL,'stderr':subprocess.DEVNULL}
+        if os.name=='nt':kwargs['creationflags']=getattr(subprocess,'CREATE_NO_WINDOW',0)
+        proc=subprocess.Popen([sys.executable,'-m','http.server',str(port),'--bind','127.0.0.1'],**kwargs)
+        for _ in range(30):
+            if is_listening(port):break
+            if proc.poll() is not None:return None,'3D file server exited unexpectedly.'
+            time.sleep(0.15)
+    if not is_listening(port):return None,'3D file server could not start.'
+    return f'http://127.0.0.1:{port}/',None
+
+NAV_ITEMS = ['Home','Engagement Predictor','Caption Generator','Photo Advisor','3D Crochet Designer']
+
+def navigate_to(destination):
+    st.session_state['nav_section'] = destination
+
+
+def feature_banner(icon, eyebrow, title, subtitle, tint):
+    st.markdown(
+        f'<div class="feature-banner" style="background:linear-gradient(110deg,{tint},#fffaf6)">'
+        f'<div class="feature-icon">{icon}</div><div>'
+        f'<div class="feature-eyebrow">{eyebrow}</div>'
+        f'<div class="feature-title">{title}</div>'
+        f'<div class="feature-sub">{subtitle}</div></div></div>',
+        unsafe_allow_html=True,
+    )
+
+if 'nav_section' not in st.session_state:
+    st.session_state['nav_section'] = 'Home'
+
+with st.sidebar:
+    st.markdown(
+        f'<div style="text-align:center;padding:8px 0 4px">'
+        f''
+        f'<div style="font-family:Fredoka,sans-serif;font-size:1.45rem;font-weight:700;color:#402515">Fluffy AI Studio</div>'
+        f'<div style="font-size:.82rem;color:#806b5d">Your little crochet workspace</div></div>',unsafe_allow_html=True)
+    st.divider()
+    st.radio('Explore',NAV_ITEMS,key='nav_section',label_visibility='collapsed')
+    st.divider()
+    st.caption('Made for makers, one stitch at a time.')
+    st.caption('AI estimates are experimental and are not guaranteed engagement outcomes.')
+
+section=st.session_state['nav_section']
+
+if section != 'Home':
+    st.button('← Back to menu', key='back_to_menu', on_click=navigate_to, args=('Home',))
+
+if section=='Home':
+    st.markdown(
+        f'<div class="hero"><img class="hero-logo" src="data:image/png;base64,{FLUFFY_LOGO}">'
+        f'<div class="hero-copy"><div class="section-kicker">A little creativity, a little AI</div>'
+        f'<h1>Make it. Style it. Share it.</h1>'
+        f'<p>Your cozy creative corner for crochet content. Pick a tool below and let’s make something lovely.</p></div>'
+        f'<div class="yarn-float yarn-ball" aria-hidden="true"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="#f6a0ad" stroke="#402515" stroke-width="3"/><path d="M12 22c13 1 25 11 39 30M10 34c16-9 29-8 45 7M20 9c-1 16 9 31 29 43M42 9C26 20 20 35 20 54" fill="none" stroke="#fff4eb" stroke-width="3.5" stroke-linecap="round"/><path d="M8 48c-7 9-4 13 5 12" fill="none" stroke="#b7a5d5" stroke-width="3" stroke-linecap="round"/></svg></div><div class="yarn-float thread" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M8 48C18 6 45 8 54 30S25 53 16 34 38 5 57 14" fill="none" stroke="#b7a5d5" stroke-width="4" stroke-linecap="round"/><path d="M8 48c-3 8-1 11 7 10" fill="none" stroke="#402515" stroke-width="1.5" stroke-linecap="round"/></svg></div><div class="yarn-float hook" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M30 5v23c0 10-15 10-15 0" fill="none" stroke="#b7a5d5" stroke-width="5" stroke-linecap="round"/><path d="M15 28q0-7 7-7" fill="none" stroke="#402515" stroke-width="2" stroke-linecap="round"/></svg></div><div class="yarn-float scissors" aria-hidden="true"><svg viewBox="0 0 48 48"><circle cx="12" cy="34" r="6" fill="none" stroke="#f6a0ad" stroke-width="4"/><circle cx="27" cy="34" r="6" fill="none" stroke="#f6a0ad" stroke-width="4"/><path d="M16 29L37 7M23 29L8 8" stroke="#402515" stroke-width="3" stroke-linecap="round"/></svg></div><div class="yarn-float tape" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="8" y="13" width="32" height="22" rx="7" fill="#fff4eb" stroke="#d69b55" stroke-width="3"/><path d="M15 14v8m6-8v5m6-5v8m6-8v5" stroke="#402515" stroke-width="2"/></svg></div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="stitch-line"></div>',unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">Pick your next little project</div>',unsafe_allow_html=True)
+    st.subheader('What would you like to create today?')
+    c1,c2=st.columns(2,gap='large')
+    with c1:
+        with st.container(key='card_engagement'):
+            st.button('ENGAGEMENT PREDICTOR\n\nEstimate likes and comments for your next Instagram post.\n\nOpen predictor  →',key='go_engagement',use_container_width=True,on_click=navigate_to,args=('Engagement Predictor',))
+        with st.container(key='card_caption'):
+            st.button('CAPTION GENERATOR\n\nFind the right words for your handmade creations.\n\nOpen caption studio  →',key='go_caption',use_container_width=True,on_click=navigate_to,args=('Caption Generator',))
+    with c2:
+        with st.container(key='card_photo'):
+            st.button('PHOTO ADVISOR\n\nGet friendly, practical tips for your product photos.\n\nOpen photo advisor  →',key='go_photo',use_container_width=True,on_click=navigate_to,args=('Photo Advisor',))
+        with st.container(key='card_crochet'):
+            st.button('🧵  3D Crochet Designer\n\nExplore patterns and bring crochet ideas into 3D.\n\nOpen 3D designer  →',key='go_crochet',use_container_width=True,on_click=navigate_to,args=('3D Crochet Designer',))
+    st.markdown('<div class="stitch-line"></div>',unsafe_allow_html=True)
+    st.markdown('<div class="stitch-note">“Every stitch tells a story.” &nbsp; 🧶 &nbsp; A cozy place to dream, design and make.</div>',unsafe_allow_html=True)
+
+elif section=='Engagement Predictor':
+    feature_banner('📈','Your little growth helper','Engagement Predictor','Estimate likes and comments before sharing your next post.','#e8f5f9')
+    st.title('Instagram Engagement Predictor')
+    st.write('See estimated likes and comments **before publishing** your crochet post.')
+    st.info('The prediction models were trained on historical Instagram data. Actual results can differ substantially due to reach, trends and algorithm changes.')
+    st.caption('⚡ Models load once per server session. Reusing the same photo or caption skips its embedding calculation; changing only posting details reuses both.')
+    with st.form('prediction'):
+        left,right=st.columns([1,1])
+        with left:
+            uploaded=st.file_uploader('Upload your post image',type=['png','jpg','jpeg','webp'],key='prediction_image')
+            caption=st.text_area('Instagram caption',height=160,placeholder='Handmade with love 🧶✨')
+            followers=st.number_input('Follower count',min_value=0,max_value=100000000,value=5000,step=100)
+        with right:
+            post_type=st.selectbox('Post type',['Carousel','Post','Reel'])
+            day=st.selectbox('Posting day',['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'])
+            hour=st.slider('Posting hour (24-hour clock)',0,23,18)
+            st.caption('For carousels or Reels, the uploaded image represents a single cover/thumbnail, as in the training data.')
+        submitted=st.form_submit_button('✨ Predict engagement',type='primary',use_container_width=True)
+    if uploaded:
+        st.image(uploaded,caption='Your selected post image',width=260)
+    if submitted:
+        if not uploaded:
+            st.warning('Upload a photo to generate predictions.')
+        else:
+            try:
+                with st.spinner('Fluffy is counting stitches and checking the details…'):
+                    likes,comments=predict_engagement(uploaded.getvalue(),caption,followers,hour,post_type,day)
+                    st.session_state['last_prediction'] = (likes,comments)
+                a,b=st.columns(2)
+                a.metric('❤️ Predicted likes',f'{likes:,}')
+                b.metric('💬 Predicted comments',f'{comments:,}')
+                st.caption('Rounded, nonnegative model estimates. No uncertainty interval is available from the saved models.')
+            except Exception as exc:
+                st.error(f'Prediction failed: {exc}')
+                st.info('On first run, MobileNetV2 and the multilingual sentence encoder may need to download pretrained weights.')
+
+elif section=='Caption Generator':
+    feature_banner('✍️','Find the right words','Caption Generator','Give your handmade creations a caption that feels like you.','#fff0f1')
+    st.title('AI Caption Generator')
+    st.write('Generate a crochet-product caption using your original OpenRouter feature.')
+    with st.form('caption_form'):
+        product=st.text_input('Describe your product',placeholder='Pink crochet bunny with a bow')
+        tone=st.selectbox('Tone',['Cute and playful','Elegant','Warm and friendly','Minimal','Fun and catchy'])
+        language=st.selectbox('Language',['English','Arabic','English and Arabic'])
+        price=st.text_input('Price (optional)',placeholder='20 BD')
+        go=st.form_submit_button('✨ Generate caption',type='primary')
+    if go:
+        if not product.strip():st.warning('Describe the product first.')
+        else:
+            prompt=f'''Generate a creative Instagram caption for a crochet business. Product: {product}. Tone: {tone}. Language: {language}. Price: {price or 'Not specified'}. Keep it short, natural and engaging. Include suitable emojis and do not invent product details. If price is unspecified, do not mention a price.'''
+            try:
+                with st.spinner('Fluffy is untangling just the right words…'):
+                    result=ask_openrouter(prompt)
+                st.subheader('Your caption')
+                st.write(result)
+            except Exception as exc:st.error(f'Caption generation failed: {exc}')
+
+elif section=='Photo Advisor':
+    feature_banner('📷','A fresh pair of eyes','Photo Advisor','Little styling and photography tips for your crochet products.','#f0ebf8')
+    st.title('AI Photo Advisor')
+    st.write('Get practical photography feedback for your crochet product photos.')
+    photo_file=st.file_uploader('Upload a crochet product photo',type=['png','jpg','jpeg','webp'],key='advisor_image')
+    if photo_file:st.image(photo_file,width=360)
+    if st.button('🔎 Analyze my photo',type='primary'):
+        if not photo_file:st.warning('Upload a photo first.')
+        else:
+            prompt='''You are a product photography advisor for crochet businesses. Analyze this Instagram product photo. Evaluate: (1) background and distractions, (2) lighting and shadows, (3) product positioning and camera angle, (4) human presence and scale, (5) composition and styling. Give 3 to 5 specific actionable recommendations. Explain what you can actually observe. Do not assume people or props are always better. Do not claim any change will increase likes.'''
+            try:
+                with st.spinner('Fluffy is taking a closer look at your photo…'):
+                    result=ask_openrouter(prompt,Image.open(photo_file),model=os.getenv('OPENROUTER_VISION_MODEL','inclusionai/ling-3.2-flash:free'),timeout=120)
+                st.subheader('Photography feedback')
+                st.write(result)
+            except Exception as exc:
+                st.error(f'Photo analysis failed: {exc}')
+                st.info('If the free vision model is unavailable, configure OPENROUTER_VISION_MODEL with a vision-capable model available to your account.')
+
+elif section=='3D Crochet Designer':
+    feature_banner('🧶','Into the making room','3D Crochet Designer','Explore your crochet ideas in a playful 3D workspace.','#edf3e4')
+    st.title('3D Crochet Designer')
+    st.write('The original CrochetPARADE pattern editor and 3D renderer are preserved from your uploaded ZIP.')
+    remote=os.getenv('CROCHETPARADE_URL','').strip()
+    if remote:
+        if remote.startswith(('https://','http://')):
+            st.caption('Using externally hosted CrochetPARADE engine.')
+            components.iframe(remote,height=980,scrolling=True)
+        else:st.error('CROCHETPARADE_URL must start with https:// or http://')
+    else:
+        url,error=start_engine()
+        if error:st.error(error)
+        else:
+            st.caption('Local CrochetPARADE editor')
+            components.iframe(url,height=980,scrolling=True)
+            st.info('For a remote Streamlit deployment, host the crochet_engine directory as a static website and set CROCHETPARADE_URL to its public URL. A browser cannot access the remote server’s localhost iframe.')
+    st.caption('CrochetPARADE is an open-source project. Its original license and attribution are retained in crochet_engine/.')
