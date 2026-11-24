@@ -7,3 +7,4 @@ joblib>=1.4,<2
 scikit-learn==1.9.1
 tensorflow>=2.16,<2.22
 sentence-transformers>=3,<6
+python-dotenv
