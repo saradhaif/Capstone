@@ -145,8 +145,8 @@ def cached_embeddings(photo_bytes: bytes, caption: str):
         st.session_state['_photo_embedding_key'] = photo_key
     
     if st.session_state.get('_caption_embedding_key') != text_key:
-    st.session_state['_caption_embedding'] = encode_caption(caption)
-    st.session_state['_caption_embedding_key'] = text_key
+        st.session_state['_caption_embedding'] = encode_caption(caption)
+        st.session_state['_caption_embedding_key'] = text_key
 
     return st.session_state['_photo_embedding'], st.session_state['_caption_embedding']
 
