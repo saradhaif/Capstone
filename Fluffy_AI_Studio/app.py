@@ -32,7 +32,11 @@ st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fredoka:wght@500;600;700&display=swap');
 :root {--blue:#DFF2F8;--pink:#F6A0AD;--lavender:#B7A5D5;--sage:#DDEBCB;--cream:#FFF4EB;--brown:#402515;}
 .stApp {background:linear-gradient(145deg,#f7fcfd 0%,#fff8f3 48%,#fbf5fc 100%);color:var(--brown);}
-.block-container {max-width:1280px;padding-top:1.4rem;padding-bottom:3rem;}
+.block-container {
+    max-width: 1280px;
+    padding-top: 5rem !important;
+    padding-bottom: 3rem;
+}
 h1,h2,h3,.brand-title {font-family:'Fredoka',sans-serif!important;color:var(--brown)!important;}
 p,label,.stMarkdown {font-family:'DM Sans',sans-serif;}
 [data-testid="stSidebar"] {background:linear-gradient(180deg,#eaf7fb,#f8edf7 72%,#fff4eb);border-right:1px solid #eadbd2;}
