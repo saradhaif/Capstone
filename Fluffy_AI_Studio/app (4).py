@@ -83,10 +83,10 @@ div.st-key-card_crochet .stButton>button p {
     line-height: 1.35 !important;
     margin: 0 !important;
 }
-div.st-key-card_engagement .stButton>button p::before {content:"📊";display:block;font-size:3rem;line-height:1.2;margin-bottom:14px;}
-div.st-key-card_caption .stButton>button p::before {content:"✨";display:block;font-size:3rem;line-height:1.2;margin-bottom:14px;}
-div.st-key-card_photo .stButton>button p::before {content:"📸";display:block;font-size:3rem;line-height:1.2;margin-bottom:14px;}
-div.st-key-card_crochet .stButton>button p::before {content:"🧶";display:block;font-size:3rem;line-height:1.2;margin-bottom:14px;}
+div.st-key-card_engagement .stButton>button p::after {content:"📊";display:block;font-size:1.5rem;line-height:1.2;margin-top:10px;}
+div.st-key-card_caption .stButton>button p::after {content:"✨";display:block;font-size:1.5rem;line-height:1.2;margin-top:10px;}
+div.st-key-card_photo .stButton>button p::after {content:"📸";display:block;font-size:1.5rem;line-height:1.2;margin-top:10px;}
+div.st-key-card_crochet .stButton>button p::after {content:"🧶";display:block;font-size:1.5rem;line-height:1.2;margin-top:10px;}
 div.st-key-card_engagement .stButton>button {background:#e8f5f9;} div.st-key-card_caption .stButton>button {background:#fff0f1;} div.st-key-card_photo .stButton>button {background:#f0ebf8;} div.st-key-card_crochet .stButton>button {background:#edf3e4;}
 div.st-key-card_engagement .stButton>button:hover {background:#dff2f8;} div.st-key-card_caption .stButton>button:hover {background:#fbe2e6;} div.st-key-card_photo .stButton>button:hover {background:#e8def4;} div.st-key-card_crochet .stButton>button:hover {background:#e3edda;}
 div[data-testid="stMetric"] {background:#fffaf6;border:1px solid #eadbd2;padding:15px;border-radius:18px;}
