@@ -349,7 +349,7 @@ elif section=='Photo Advisor':
             prompt='''You are a product photography advisor for crochet businesses. Analyze this Instagram product photo. Evaluate: (1) background and distractions, (2) lighting and shadows, (3) product positioning and camera angle, (4) human presence and scale, (5) composition and styling. Give 3 to 5 specific actionable recommendations. Explain what you can actually observe. Do not assume people or props are always better. Do not claim any change will increase likes.'''
             try:
                 with st.spinner('Fluffy is taking a closer look at your photo…'):
-                    result=ask_openrouter(prompt,Image.open(photo_file),model=os.getenv('OPENROUTER_VISION_MODEL','inclusionai/ling-3.2-flash:free'),timeout=120)
+                    result=ask_openrouter(prompt,Image.open(photo_file),model=os.getenv('OPENROUTER_VISION_MODEL','openrouter/free'),timeout=120)
                 st.subheader('Photography feedback')
                 st.write(result)
             except Exception as exc:
