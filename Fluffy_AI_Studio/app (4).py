@@ -409,7 +409,39 @@ elif section=='Caption Generator':
     if go:
         if not product.strip():st.warning('Describe the product first.')
         else:
-            prompt=f'''Generate a creative Instagram caption for a crochet business. Product: {product}. Tone: {tone}. Language: {language}. Price: {price or 'Not specified'}. Keep it short, natural and engaging. Include suitable emojis and do not invent product details. If price is unspecified, do not mention a price.'''
+            prompt=f'''
+            Generate a creative Instagram caption for a crochet business.
+            
+            Product: {product}
+            Tone: {tone}
+            Language: {language}
+            Price: {price or 'Not specified'}
+            
+            Instructions:
+            - Keep it short, natural and engaging.
+            - Include suitable emojis.
+            - Treat the product description as the source of truth.
+            - Never change or misidentify the product.
+            - Preserve the exact animal, colour and product details.
+            - Do not invent any product attributes.
+            - If both English and Arabic are requested, generate the English
+              caption first, then translate the SAME caption into Arabic.
+            - Use natural Arabic suitable for Bahraini and GCC businesses.
+            - Verify that both captions match the original product description.
+            
+            Correct Arabic translations:
+            - Bear = دب
+            - Teddy bear = دبدوب
+            - Goat = عنزة
+            - Bunny = أرنب
+            - Deer = غزال
+            - Giraffe = زرافة
+            - Swan = بجعة
+            
+            If a price is provided, mention it only once at the end.
+            If price is unspecified, do not mention a price.
+            Return only the caption, without explanations or language headings.
+            '''
             try:
                 with st.spinner('Fluffy is untangling just the right words…'):
                     result=ask_openrouter(prompt)
